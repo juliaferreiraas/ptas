@@ -3,6 +3,19 @@ require("dotenv-safe").config();
 const jwt = require('jsonwebtoken');
 var { expressjwt: expressJWT } = require("express-jwt");
 const cors = require('cors');
+const crypto = require('crypto');
+const CHAVE = 'bf3c199c2470cb477d907b1e0917c17e'; // 32
+const IV = "5183666c72eec9e4"; // 16
+const ALGORITMO = "aes-256-cbc";
+const METODO_CRIPTOGRAFIA = 'hex';
+const METODO_DESCRIPTOGRAFIA = 'hex';
+
+const encrypt = ((text) =>  {
+  let cipher = crypto.createCipheriv(ALGORITMO, CHAVE, IV);
+  let encrypted = cipher.update(text, 'utf8', METODO_CRIPTOGRAFIA);
+  encrypted += cipher.final(METODO_CRIPTOGRAFIA);
+  return encrypted; 
+}); 
 
 var cookieParser = require('cookie-parser')
 
@@ -42,7 +55,11 @@ app.get('/cadastro', async function(req, res){
   });
 
   app.post('/cadastro', async function(req, res){
-    const usuario_ = await usuario.create(req.body)
+    const usuario_ = await usuario.create({
+      nome:req.body.nome,
+      usuario:req.body.usuario,
+      senha: encrypt(req.body.senha)
+    })
     res.json(usuario_)
     });
 
@@ -52,18 +69,11 @@ app.get('/', async function(req, res){
 
 app.post('/logar', async (req, res) => {
   const banco = await usuario.findOne({where: {usuario:req.body.user}})
-  
-  const encrypt = ((text) =>  {
-    let cipher = crypto.createCipheriv(ALGORITMO, CHAVE, IV);
-    let encrypted = cipher.update(text, 'utf8', METODO_CRIPTOGRAFIA);
-    encrypted += cipher.final(METODO_CRIPTOGRAFIA);
-    return encrypted;
- }); 
  
   const encrypted = encrypt(req.body.password);
   console.log(encrypted);
 
-  if(req.body.user === banco.usuario && req.body.password === banco.senha){
+  if(req.body.user === banco.usuario && encrypted === banco.senha){
     const id = 1;
     const token = jwt.sign({ id }, process.env.SECRET, {
       expiresIn: 3600 // expira in 1h
